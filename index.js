@@ -1,47 +1,85 @@
 import express from "express";
+import fs from "fs";
+import { nanoid } from "nanoid";
 
 const app = express();
 app.use(express.json());
 
-let todos = [{ id: 1, name: "Sereh" }];
+const fileData = fs.readFileSync("./data.json", "utf-8");
+
+let todos = JSON.parse(fileData);
 
 app.get("/", (req, res) => {
   return res.send(todos);
 });
 
+const updateFileData = () => {
+  fs.writeFileSync("./data.json", JSON.stringify(todos), "utf-8");
+};
+
 app.post("/", (req, res) => {
   const body = req.body;
-  const name = body.name;
+  const task = body.task;
+  if (!task) {
+    return res.status(400).send({ message: "Task connot be empty" });
+  }
   const newTodo = {
-    id: todos[todos.length - 1].id + 1,
-    name: name,
+    id: nanoid(),
+    task: task,
+    checked: false,
   };
   todos.push(newTodo);
-  return res.send(newTodo);
+  updateFileData();
+  return res.send({ message: "Task successfully added", newTodo });
 });
 
 app.get("/:id", (req, res) => {
   const id = req.params.id;
-  const todo = todos.find((item) => item.id == id);
   if (!todo) {
-    return res.status(404).send({ message: "Not found" });
+    return res.status(404).send({ message: "Task not found" });
   }
+  const todo = todos.find((item) => item.id == id);
   return res.send(todo);
 });
 
 app.delete("/:id", (req, res) => {
   const id = Number(req.params.id);
+  const deletedTask = todos.find((item) => item.id == id);
+  if (!deletedTask) {
+    return res.status(404).send({ message: "Task not found" });
+  }
   todos = todos.filter((item) => item.id !== id);
-  res.send(todos);
+  updateFileData();
+  res.send({ message: "Successfully deleted", deletedTask });
 });
 
 app.put("/:id", (req, res) => {
   const body = req.body;
-  const name = body.name;
+  const task = body.task;
+  const checked = Boolean(body.checked);
   const id = Number(req.params.id);
-  const index = todos.findIndex((item) => item.id == id);
-  todos[index].name = name;
-  res.send(todos);
+  const updatedTask = todos.find((todo) => todo.id == id);
+  if (!updatedTask) {
+    return res.status(404).send({ message: "Task not found" });
+  }
+  if (!task && checked === undefined) {
+    return res
+      .status(400)
+      .send({ message: "Body must have atleast task or checked" });
+  }
+  const editedTask = {
+    ...updatedTask,
+    ...(task && { task }),
+    ...(checked !== undefined && { checked }),
+  };
+  todos = todos.map((todo) => {
+    if (todo.id == id) {
+      return editedTask;
+    }
+    return todo;
+  });
+  updateFileData();
+  res.send({ message: "Successfully edited", editedTask });
 });
 
 app.listen(3400, () => {
