@@ -3,6 +3,7 @@ import fs from "fs";
 import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { UserModel } from "../models/user-model.js";
 
 const router = express.Router();
 
@@ -10,15 +11,15 @@ const userData = fs.readFileSync("./users.json", "utf-8");
 
 let users = JSON.parse(userData);
 
-const updateUserData = () => {
-  fs.writeFileSync("./users.json", JSON.stringify(users), "utf-8");
-};
+// const updateUserData = () => {
+//   fs.writeFileSync("./users.json", JSON.stringify(users), "utf-8");
+// };
 
 router.get("/", (req, res) => {
   return res.send(users);
 });
 
-router.post("/signup", (req, res) => {
+router.post("/signup", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res
@@ -30,7 +31,9 @@ router.post("/signup", (req, res) => {
     return res.status(400).send({ message: "Username cannot contain spaces" });
   }
 
-  const existingUser = users.find((user) => user.username == username);
+  // const existingUser = users.find((user) => user.username == username);
+  const existingUser = await UserModel.findOne({ username: username });
+
   if (existingUser) {
     return res.status(400).send({ message: "Username already taken" });
   }
@@ -52,13 +55,17 @@ router.post("/signup", (req, res) => {
 
   const hashedPassword = bcrypt.hashSync(password, 10);
 
-  const newUser = {
-    id: nanoid(),
+  // const newUser = {
+  //   id: nanoid(),
+  //   username,
+  //   password: hashedPassword,
+  // };
+  // users.push(newUser);
+  // updateUserData();
+  const newUser = await UserModel.create({
     username,
     password: hashedPassword,
-  };
-  users.push(newUser);
-  updateUserData();
+  });
   return res.send({ message: "User successfully added", newUser });
 });
 
