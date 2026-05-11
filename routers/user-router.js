@@ -2,6 +2,7 @@ import express from "express";
 import fs from "fs";
 import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get("/", (req, res) => {
   return res.send(users);
 });
 
-router.post("/", (req, res) => {
+router.post("/signup", (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res
@@ -61,7 +62,7 @@ router.post("/", (req, res) => {
   return res.send({ message: "User successfully added", newUser });
 });
 
-router.post("/check", (req, res) => {
+router.post("/signin", (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res
@@ -71,11 +72,41 @@ router.post("/check", (req, res) => {
 
   const existingUser = users.find((user) => user.username == username);
   if (!existingUser) {
-    return res.status(400).send({ message: "User not found" });
+    return res.status(401).send({ message: "Wrong credentials" });
   }
 
   const isMatching = bcrypt.compareSync(password, existingUser.password);
-  return res.send(isMatching);
+  if (!isMatching) {
+    return res.status(401).send({ message: "Wrong credentials" });
+  }
+
+  const { password: hashedPassword, ...userWithoutPassword } = existingUser;
+  const accessToken = jwt.sign(existingUser, "MyPassword", { expiresIn: "5m" });
+
+  return res.send({ message: "Successfully signed in", accessToken });
+});
+
+router.get("/me", (req, res) => {
+  const rawToken = req.headers.authorization;
+
+  if (!rawToken.startsWith("Bearer")) {
+    return res.status(401).send({ message: "Invalid token" });
+  }
+  const token = rawToken.split(" ")[1];
+
+  let payload = null;
+  try {
+    payload = jwt.verify(token, "MyPassword");
+  } catch (e) {
+    return res.status(401).send({ message: "Invalid token" });
+  }
+
+  const existingUser = users.find((user) => user.id == payload.id);
+
+  return res.send(existingUser);
 });
 
 export default router;
+
+//nyamochir JnCj2n3KsKl0Tgs9
+//mongodb+srv://nyamochir:JnCj2n3KsKl0Tgs9@cluster0.jikqleo.mongodb.net/todo-app
